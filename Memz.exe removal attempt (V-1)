@@ -1,0 +1,54 @@
+# PowerShell script to remove memz.exe and similar malware
+
+# Step 1: Terminate any running processes related to memz.exe
+$processName = "memz.exe"  # You can also add other variations like "memez.exe" if needed
+
+# List all processes with the given name and kill them
+Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "Killing process: $($_.Name)"
+    Stop-Process -Id $_.Id -Force
+}
+
+# Step 2: Remove malicious files from temp and system directories
+$tempDirs = @(
+    "$env:Temp", "C:\Windows\Temp"
+)
+
+foreach ($tempDir in $tempDirs) {
+    Write-Host "Cleaning up directory: $tempDir"
+    Remove-Item -Path "$tempDir\*" -Force -Recurse -ErrorAction SilentlyContinue
+}
+
+# Step 3: Remove registry entries for startup persistence
+$regPaths = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run"
+)
+
+foreach ($regPath in $regPaths) {
+    Write-Host "Checking registry path: $regPath"
+    Get-ItemProperty -Path $regPath | Where-Object { $_.PSObject.Properties.Name -match "memz.exe" } | ForEach-Object {
+        Write-Host "Deleting registry entry: $($_.PSObject.Properties.Name)"
+        Remove-ItemProperty -Path $regPath -Name $_.PSObject.Properties.Name -Force
+    }
+}
+
+# Step 4: Ensure no additional copies of memz.exe are running or persisting
+# Searching common locations where memz.exe might hide
+$searchPaths = @(
+    "C:\Users\$env:UserName\AppData\Roaming", "C:\Users\$env:UserName\AppData\Local"
+)
+
+foreach ($path in $searchPaths) {
+    $files = Get-ChildItem -Path $path -Recurse -Filter "memz.exe" -ErrorAction SilentlyContinue
+    foreach ($file in $files) {
+        Write-Host "Deleting suspicious file: $($file.FullName)"
+        Remove-Item -Path $file.FullName -Force
+    }
+}
+
+# Step 5: Disable Windows Script Host (in case it's being used for persistence)
+Write-Host "Disabling Windows Script Host (optional)"
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows Script Host\Settings" -Name "Enabled" -Value 0 -Force
+
+Write-Host "Script execution completed."
