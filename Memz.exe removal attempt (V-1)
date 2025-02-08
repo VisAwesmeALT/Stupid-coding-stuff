@@ -1,4 +1,6 @@
 <#
+.SUPERDUPERIMPORTANT
+This script was for some reason, flagged as malware?... I do not know how, but I can say this is not malware this is just meant for deleting MEMZ.exe, thats it nothing else.
 .IMPORTANT
 Before running this, to permit powershell to run local files run this command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 " as adminstator.
