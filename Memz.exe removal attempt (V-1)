@@ -1,56 +1,77 @@
-# PowerShell script to remove memz.exe and similar malware
+<#
+.SYNOPSIS
+    Forcefully terminates all processes named "memz.exe" or "memez.exe" simultaneously.
+.DESCRIPTION
+    This script searches for running processes with names that match "memz.exe" or "memez.exe". 
+    It then launches background jobs to kill them all in parallel to minimize any delay that could 
+    let the malware progress to a more dangerous "Phase 2". 
+    Designed for use in a controlled environment (e.g., a triage VM).
+.NOTES
+    Run this script with Administrator privileges.
+#>
 
-# Step 1: Terminate any running processes related to memz.exe
-$processNames = @("memz.exe", "memez.exe")  # Add other variations if needed
+# Ensure the script is running as Administrator
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+    Write-Error "This script must be run as Administrator. Please run it using 'Run as Administrator'."
+    exit 1
+}
 
-# List all processes with the given names and kill them
-foreach ($processName in $processNames) {
-    Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Host "Killing process: $($_.Name)"
-        Stop-Process -Id $_.Id -Force
+# Define the process name variants to target
+$processNames = @("memz.exe", "memez.exe")
+
+# Array to hold background jobs
+$jobs = @()
+
+Write-Host "Searching for malicious processes..." -ForegroundColor Cyan
+
+foreach ($name in $processNames) {
+    # Get processes matching the name (case-insensitive)
+    $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
+    if ($procs) {
+        foreach ($proc in $procs) {
+            Write-Host "Scheduling kill for $($proc.Name) (PID: $($proc.Id))" -ForegroundColor Yellow
+            # Start a background job to kill this process
+            $job = Start-Job -ScriptBlock {
+                param($pid)
+                try {
+                    Stop-Process -Id $pid -Force -ErrorAction Stop
+                    Write-Output "Killed process with PID $pid"
+                }
+                catch {
+                    Write-Output "Failed to kill process with PID $pid: $_"
+                }
+            } -ArgumentList $proc.Id
+            $jobs += $job
+        }
+    }
+    else {
+        Write-Host "No processes found matching: $name" -ForegroundColor Green
     }
 }
 
-# Step 2: Remove malicious files from temp and system directories
-$tempDirs = @(
-    "$env:Temp", "C:\Windows\Temp", "C:\Users\$env:UserName\AppData\Local\Temp"
-)
-
-foreach ($tempDir in $tempDirs) {
-    Write-Host "Cleaning up directory: $tempDir"
-    Remove-Item -Path "$tempDir\*" -Force -Recurse -ErrorAction SilentlyContinue
-}
-
-# Step 3: Remove registry entries for startup persistence
-$regPaths = @(
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run"
-)
-
-foreach ($regPath in $regPaths) {
-    Write-Host "Checking registry path: $regPath"
-    Get-ItemProperty -Path $regPath | Where-Object { $_.PSObject.Properties.Name -match "memz.exe" } | ForEach-Object {
-        Write-Host "Deleting registry entry: $($_.PSObject.Properties.Name)"
-        Remove-ItemProperty -Path $regPath -Name $_.PSObject.Properties.Name -Force
+# Wait for all jobs to complete
+if ($jobs.Count -gt 0) {
+    Write-Host "Waiting for all kill jobs to finish..." -ForegroundColor Cyan
+    Wait-Job -Job $jobs
+    # Optionally, output the results of each job
+    foreach ($job in $jobs) {
+        Receive-Job -Job $job
+    }
+    # Verify if any instance is still running
+    $remaining = @()
+    foreach ($name in $processNames) {
+        $remaining += Get-Process -Name $name -ErrorAction SilentlyContinue
+    }
+    if ($remaining.Count -eq 0) {
+        Write-Host "All instances of memz.exe/memez.exe have been terminated." -ForegroundColor Green
+    }
+    else {
+        Write-Warning "Some instances may still be running!"
     }
 }
-
-# Step 4: Ensure no additional copies of memz.exe are running or persisting
-# Searching common locations where memz.exe might hide
-$searchPaths = @(
-    "C:\Users\$env:UserName\AppData\Roaming", "C:\Users\$env:UserName\AppData\Local", "C:\ProgramData", "C:\Windows\System32"
-)
-
-foreach ($path in $searchPaths) {
-    $files = Get-ChildItem -Path $path -Recurse -Filter "memz.exe" -ErrorAction SilentlyContinue
-    foreach ($file in $files) {
-        Write-Host "Deleting suspicious file: $($file.FullName)"
-        Remove-Item -Path $file.FullName -Force
-    }
+else {
+    Write-Host "No malicious processes were found to terminate." -ForegroundColor Green
 }
 
-# Step 5: Disable Windows Script Host (in case it's being used for persistence)
-Write-Host "Disabling Windows Script Host (optional)"
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows Script Host\Settings" -Name "Enabled" -Value 0 -Force
-
-Write-Host "Script execution completed."
+Write-Host "Script execution completed." -ForegroundColor Cyan
