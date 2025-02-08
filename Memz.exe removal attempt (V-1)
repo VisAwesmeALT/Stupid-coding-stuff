@@ -35,6 +35,15 @@ foreach ($name in $processNames) {
             $job = Start-Job -ScriptBlock {
                 param($pid)
                 try {
+                    # Check if the process is a parent process
+                    $childProcs = Get-WmiObject Win32_Process -Filter "ParentProcessId=$pid"
+                    if ($childProcs) {
+                        foreach ($childProc in $childProcs) {
+                            Stop-Process -Id $childProc.ProcessId -Force -ErrorAction Stop
+                            Write-Output "Killed child process with PID $($childProc.ProcessId)"
+                        }
+                    }
+                    # Kill the parent process
                     Stop-Process -Id $pid -Force -ErrorAction Stop
                     Write-Output "Killed process with PID $pid"
                 }
