@@ -1,4 +1,7 @@
 <#
+.IMPORTANT
+Before running this, to permit powershell to run local files run this command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+" as adminstator.
 .SYNOPSIS
     Forcefully terminates all processes named "memz.exe" or "memez.exe" simultaneously.
 .DESCRIPTION
