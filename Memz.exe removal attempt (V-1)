@@ -1,17 +1,19 @@
 # PowerShell script to remove memz.exe and similar malware
 
 # Step 1: Terminate any running processes related to memz.exe
-$processName = "memz.exe"  # You can also add other variations like "memez.exe" if needed
+$processNames = @("memz.exe", "memez.exe")  # Add other variations if needed
 
-# List all processes with the given name and kill them
-Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "Killing process: $($_.Name)"
-    Stop-Process -Id $_.Id -Force
+# List all processes with the given names and kill them
+foreach ($processName in $processNames) {
+    Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Host "Killing process: $($_.Name)"
+        Stop-Process -Id $_.Id -Force
+    }
 }
 
 # Step 2: Remove malicious files from temp and system directories
 $tempDirs = @(
-    "$env:Temp", "C:\Windows\Temp"
+    "$env:Temp", "C:\Windows\Temp", "C:\Users\$env:UserName\AppData\Local\Temp"
 )
 
 foreach ($tempDir in $tempDirs) {
@@ -36,7 +38,7 @@ foreach ($regPath in $regPaths) {
 # Step 4: Ensure no additional copies of memz.exe are running or persisting
 # Searching common locations where memz.exe might hide
 $searchPaths = @(
-    "C:\Users\$env:UserName\AppData\Roaming", "C:\Users\$env:UserName\AppData\Local"
+    "C:\Users\$env:UserName\AppData\Roaming", "C:\Users\$env:UserName\AppData\Local", "C:\ProgramData", "C:\Windows\System32"
 )
 
 foreach ($path in $searchPaths) {
