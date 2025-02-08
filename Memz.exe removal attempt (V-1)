@@ -23,7 +23,19 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 # Define the process name variants to target
-$processNames = @("memz.exe", "memez.exe")
+# (i recomend adding more forms of memz.exe on here using wild cards, it tends to change its lettering.)
+$processNames = @(
+    "memz.exe",       # Standard process name
+    "memez.exe",      # Common typo
+    "MEMZ*.exe",      # Catch variations of MEMZ (including upper/lower case and any additional characters)
+    "memz*.exe",      # Catch memz.exe and any variations of it
+    "memez*.exe",     # Catch memez.exe and any variations of it
+    "MEMEZ*.exe",     # Extra variation for memez with a possible typo
+    "memz.exe*",      # Matches any process with 'memz.exe' and additional characters
+    "memez.exe*"      # Matches any process with 'memez.exe' and additional characters
+    "memz.exe 32*"    # Match variations with "memz.exe 32" (e.g., 32-bit)
+)
+
 
 # Array to hold background jobs
 $jobs = @()
