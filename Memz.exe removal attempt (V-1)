@@ -1,68 +1,105 @@
 <#
+.CREDITS (and the usual stupid humor...)
+If you decide to reuse or remake this in your own projects, credit DrKel or visawesme. And I swear to *god*if you steal my work and claim it as yours, I’ll be filing a very cool thing called a DMCA. Ever heard of it?
+Horrible code written by Dr. Kel, who loves VoTV so much they started pretending to be Kel (NOT THE KEL FROM OMORI, THE ONE FROM VOICES OF THE VOID).
+-- Yeah, I’m not okay.
+This script is not responsible for any damage to your system, your sanity, or your cat’s trust in you.
+If you experience issues, please contact your local IT department, or better yet, a therapist.
+Seriously, don’t run this on your main machine unless you’re ready for the game "Will it boot tomorrow?"
+-[--]---[--]---ACTUAL CODE BEGINS HERE---[--]---[--]-
+.DANGER
+Very dangerous script (who would've guessed?), this thing could potentially cause more damage than MEMZ itself... 
+-- But then again, MEMZ already wrecks your system, so what's the worst that could happen? (Other than, y'know, everything).
+If you're running this in VMware or VirtualBox, please for the love of all that is holy... remember VM escapes are a thing. --
+-- Use Triage if you have a lifetime to spare, but don’t be surprised if they take 8 hours just to approve your account. Very efficient, 10/10, would recommend.
 .SUPERDUPERIMPORTANT
-This script was for some reason, flagged as malware?... I do not know how, but I can say this is not malware this is just meant for deleting MEMZ.exe, thats it nothing else.
+This script is intended for highly controlled environments (e.g., a triage VM or a random computer you found under a table). 
+It forcefully terminates processes associated with MEMZ.exe or its variants. It's like hitting a sledgehammer to kill a fly—efficient, but don't expect a clean outcome. 
+If your system is already compromised... well, congratulations, you’re already living in the danger zone.
 .IMPORTANT
-Before running this, to permit powershell to run local files run this command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser" as adminstator.
+Before running, make sure to set the execution policy with:
+  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+(Side note: don't blame me if this somehow turns your computer into a toaster).
 .SYNOPSIS
-    Forcefully terminates all processes named "memz.exe" or "memez.exe" simultaneously.
+    Terminates all processes matching the specified MEMZ variants (because if you're reading this, you're clearly desperate).
 .DESCRIPTION
-    This script searches for running processes with names that match "memz.exe" or "memez.exe". 
-    It then launches background jobs to kill them all in parallel to minimize any delay that could 
-    let the malware progress to a more dangerous "Phase 2". 
-    Designed for use in a controlled environment (e.g., a triage VM).
+    This script hunts down processes with names that could be MEMZ.exe, meme.exe, or something your dog could’ve typed with their paws. 
+    It then goes full Terminator on them using background jobs, because why not multitask when you’re potentially breaking everything?
 .NOTES
-    Run this script with Administrator privileges.
+    Run this script as Administrator (no, seriously, do it).
+    WARNING: This script is like a wrecking ball—you might lose some files you didn't know you loved, so proceed with caution.
 #>
 
+# Define primary process name variants (wildcards used for matching variants)
+$processNames = @(
+    "memz.exe",       # Standard process name
+    "memez.exe",      # Common typo
+    "MEMZ*.exe",      # Variations (case-insensitive)
+    "memz*.exe",      # Variations
+    "memez*.exe",     # Variations
+    "MEMEZ*.exe",     # Extra variation
+    "memz.exe*",      # Processes starting with memz.exe
+    "memez.exe*",     # Processes starting with memez.exe
+    "memz.exe 32*"    # Variations including "32" (e.g., 32-bit)
+)
+
+# Define additional variants to target using wildcards
+$additionalProcessNames = @(
+    "memz*.com", "memez*.com",
+    "memz*.bat", "memez*.bat",
+    "memz*.cmd", "memez*.cmd",
+    "memz*.scr", "memez*.scr",
+    "memz*.pif", "memez*.pif",
+    "memz*.dll", "memez*.dll",
+    "memz*.sys", "memez*.sys",
+    "memz*.vbs", "memez*.vbs",
+    "memz*.js",  "memez*.js",
+    "memz*.jse", "memez*.jse",
+    "memz*.wsf", "memez*.wsf",
+    "memz*.wsh", "memez*.wsh",
+    "memz*.ps1", "memez*.ps1",
+    "memz*.psm1", "memez*.psm1",
+    "memz*.psd1", "memez*.psd1",
+    "memz*.hta", "memez*.hta"
+)
+
+# Combine the primary and additional process name variants
+$processNames += $additionalProcessNames
+
 # Ensure the script is running as Administrator
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
-{
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+    [Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Error "This script must be run as Administrator. Please run it using 'Run as Administrator'."
     exit 1
 }
 
-# Define the process name variants to target
-# (i recommend adding more forms of memz.exe on here using wild cards, it tends to change its lettering.)
-$processNames = @(
-    "memz.exe",       # Standard process name
-    "memez.exe",      # Common typo
-    "MEMZ*.exe",      # Catch variations of MEMZ (including upper/lower case and any additional characters)
-    "memz*.exe",      # Catch memz.exe and any variations of it
-    "memez*.exe",     # Catch memez.exe and any variations of it
-    "MEMEZ*.exe",     # Extra variation for memez with a possible typo
-    "memz.exe*",      # Matches any process with 'memz.exe' and additional characters
-    "memez.exe*",     # Matches any process with 'memez.exe' and additional characters
-    "memz.exe 32*"    # Match variations with "memz.exe 32" (e.g., 32-bit)
-)
-
-# Array to hold background jobs
+# Array to hold background jobs for killing processes
 $jobs = @()
 
 Write-Host "Searching for malicious processes..." -ForegroundColor Cyan
 
 foreach ($name in $processNames) {
-    # Get processes matching the name (case-insensitive)
-    $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
+    try {
+        $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
+    } catch {
+        $procs = $null
+    }
     if ($procs) {
         foreach ($proc in $procs) {
             Write-Host "Scheduling kill for $($proc.Name) (PID: $($proc.Id))" -ForegroundColor Yellow
-            # Start a background job to kill this process
             $job = Start-Job -ScriptBlock {
                 param($pid)
                 try {
-                    # Check if the process is a parent process
-                    $childProcs = Get-WmiObject Win32_Process -Filter "ParentProcessId=$pid"
-                    if ($childProcs) {
-                        foreach ($childProc in $childProcs) {
-                            Stop-Process -Id $childProc.ProcessId -Force -ErrorAction Stop
-                            Write-Output "Killed child process with PID $($childProc.ProcessId)"
-                        }
+                    # Attempt to kill any child processes first
+                    $childProcs = Get-CimInstance Win32_Process -Filter "ParentProcessId=$pid" -ErrorAction SilentlyContinue
+                    foreach ($child in $childProcs) {
+                        Stop-Process -Id $child.ProcessId -Force -ErrorAction Stop
+                        Write-Output "Killed child process with PID $($child.ProcessId)"
                     }
                     # Kill the parent process
                     Stop-Process -Id $pid -Force -ErrorAction Stop
                     Write-Output "Killed process with PID $pid"
-                } #finds out if your system is fucked or not (if your... running this on a main system, why?...)
-                catch {
+                } catch {
                     Write-Output "Failed to kill process with PID $pid: $_"
                 }
             } -ArgumentList $proc.Id
@@ -78,24 +115,48 @@ foreach ($name in $processNames) {
 if ($jobs.Count -gt 0) {
     Write-Host "Waiting for all kill jobs to finish..." -ForegroundColor Cyan
     Wait-Job -Job $jobs
-    # Optionally, output the results of each job
     foreach ($job in $jobs) {
         Receive-Job -Job $job
     }
-    # Verify if any instance is still running
+    # Verify if any matching process is still running
     $remaining = @()
     foreach ($name in $processNames) {
         $remaining += Get-Process -Name $name -ErrorAction SilentlyContinue
     }
     if ($remaining.Count -eq 0) {
-        Write-Host "All instances of memz.exe/memez.exe have been terminated." -ForegroundColor Green
-    }
-    else {
+        Write-Host "All instances of memz-related processes have been terminated." -ForegroundColor Green
+    } else {
         Write-Warning "Some instances may still be running!"
     }
-}
-else {
+} else {
     Write-Host "No malicious processes were found to terminate." -ForegroundColor Green
 }
 
+# Define common file paths for memz.exe/memez.exe.
+# For sensitive directories like System32, only exact file names are targeted.
+$paths = @(
+    "$env:USERPROFILE\Downloads\memz.exe",
+    "$env:USERPROFILE\Downloads\memez.exe",
+    "$env:USERPROFILE\Desktop\memz.exe",
+    "$env:USERPROFILE\Desktop\memez.exe",
+    "C:\Windows\System32\memz.exe",   # Exact file name; wildcards removed
+    "C:\Windows\System32\memez.exe"    # Exact file name; wildcards removed
+)
+
+foreach ($path in $paths) {
+    if (Test-Path $path) {
+        try {
+            Remove-Item -Path $path -Force
+            Write-Host "Deleted file: $path" -ForegroundColor Green
+        } catch {
+            Write-Warning "Failed to delete file: $path"
+        }
+    }
+}
+
 Write-Host "Script execution completed." -ForegroundColor Cyan
+<#
+Hopefully this worked, and thank you for using one of my hell holes of a script!
+If you have any questions, feel free to ask.
+End of script
+#>
