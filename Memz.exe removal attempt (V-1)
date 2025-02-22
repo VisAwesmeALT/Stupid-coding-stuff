@@ -1,6 +1,6 @@
 <#
 .CREDITS (and the usual stupid humor...)
-If you decide to reuse or remake this in your own projects, credit DrKel or visawesme. And I swear to *god*if you steal my work and claim it as yours, I’ll be filing a very cool thing called a DMCA. Ever heard of it?
+If you reuse or remake this script, credit DrKel or visawesme. And if you steal it and claim it as yours, expect a DMCA notice (or at least some serious side-eye).
 Horrible code written by Dr. Kel, who loves VoTV so much they started pretending to be Kel (NOT THE KEL FROM OMORI, THE ONE FROM VOICES OF THE VOID).
 -- Yeah, I’m not okay.
 This script is not responsible for any damage to your system, your sanity, or your cat’s trust in you.
@@ -8,29 +8,27 @@ If you experience issues, please contact your local IT department, or better yet
 Seriously, don’t run this on your main machine unless you’re ready for the game "Will it boot tomorrow?"
 -[--]---[--]---ACTUAL CODE BEGINS HERE---[--]---[--]-
 .DANGER
-Very dangerous script (who would've guessed?), this thing could potentially cause more damage than MEMZ itself... 
--- But then again, MEMZ already wrecks your system, so what's the worst that could happen? (Other than, y'know, everything).
-If you're running this in VMware or VirtualBox, please for the love of all that is holy... remember VM escapes are a thing. --
--- Use Triage if you have a lifetime to spare, but don’t be surprised if they take 8 hours just to approve your account. Very efficient, 10/10, would recommend.
+Very dangerous script (who would've guessed?)—this could potentially cause more damage than MEMZ itself.
+If you're running this in VMware or VirtualBox, please remember VM escapes are a thing.
+.Use Triage if you have a lifetime to spare, but don’t be surprised if it takes 8 hours for your account to get approved.
 .SUPERDUPERIMPORTANT
-This script is intended for highly controlled environments (e.g., a triage VM or a random computer you found under a table). 
-It forcefully terminates processes associated with MEMZ.exe or its variants. It's like hitting a sledgehammer to kill a fly—efficient, but don't expect a clean outcome. 
-If your system is already compromised... well, congratulations, you’re already living in the danger zone.
+This script is intended for highly controlled environments (e.g., a triage VM or a random computer found under a table).
+It forcefully terminates processes and attempts to remove persistence mechanisms associated with MEMZ.exe and its variants.
 .IMPORTANT
-Before running, make sure to set the execution policy with:
+Before running, make sure to set the execution policy:
   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-(Side note: don't blame me if this somehow turns your computer into a toaster).
+(Side note: don’t blame me if this turns your computer into a toaster.)
 .SYNOPSIS
-    Terminates all processes matching the specified MEMZ variants (because if you're reading this, you're clearly desperate).
+Terminates all processes matching MEMZ variants and removes common persistence mechanisms.
 .DESCRIPTION
-    This script hunts down processes with names that could be MEMZ.exe, meme.exe, or something your dog could’ve typed with their paws. 
-    It then goes full Terminator on them using background jobs, because why not multitask when you’re potentially breaking everything?
+This script hunts for processes with names like MEMZ.exe, memez.exe, etc. It then uses background jobs to kill them.
+It also looks for suspicious scheduled tasks and registry Run entries to help eliminate persistence.
 .NOTES
-    Run this script as Administrator (no, seriously, do it).
-    WARNING: This script is like a wrecking ball—you might lose some files you didn't know you loved, so proceed with caution.
+Run this script as Administrator.
+WARNING: This script is like a wrecking ball—you might lose some files you didn't know you loved.
 #>
 
-# Define primary process name variants (wildcards used for matching variants)
+# Define primary process name variants (wildcards used for matching)
 $processNames = @(
     "memz.exe",       # Standard process name
     "memez.exe",      # Common typo
@@ -133,7 +131,6 @@ if ($jobs.Count -gt 0) {
 }
 
 # Define common file paths for memz.exe/memez.exe.
-# For sensitive directories like System32, only exact file names are targeted.
 $paths = @(
     "$env:USERPROFILE\Downloads\memz.exe",
     "$env:USERPROFILE\Downloads\memez.exe",
@@ -154,9 +151,76 @@ foreach ($path in $paths) {
     }
 }
 
+# ----- Additional Persistence Removal -----
+Write-Host "Checking for persistence mechanisms..." -ForegroundColor Cyan
+
+# Remove Scheduled Tasks related to memz
+try {
+    $tasks = Get-ScheduledTask | Where-Object { $_.TaskName -like "*memz*" -or $_.TaskName -like "*memez*" }
+    if ($tasks) {
+        foreach ($task in $tasks) {
+            Write-Host "Removing scheduled task: $($task.TaskName)" -ForegroundColor Yellow
+            try {
+                Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false -ErrorAction Stop
+                Write-Host "Scheduled task $($task.TaskName) removed." -ForegroundColor Green
+            } catch {
+                Write-Warning "Failed to remove scheduled task: $($task.TaskName): $_"
+            }
+        }
+    } else {
+        Write-Host "No scheduled tasks found for memz variants." -ForegroundColor Green
+    }
+} catch {
+    Write-Warning "Error retrieving scheduled tasks: $_"
+}
+
+# Remove Registry Run entries for memz (in HKCU and HKLM)
+$registryPaths = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run"
+)
+foreach ($regPath in $registryPaths) {
+    try {
+        $props = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+        if ($props) {
+            $propNames = ($props | Get-Member -MemberType NoteProperty).Name
+            foreach ($entry in $propNames) {
+                if ($entry -match "(?i)memz|memez") {
+                    Write-Host "Removing registry entry '$entry' from $regPath" -ForegroundColor Yellow
+                    try {
+                        Remove-ItemProperty -Path $regPath -Name $entry -ErrorAction Stop
+                        Write-Host "Registry entry '$entry' removed." -ForegroundColor Green
+                    } catch {
+                        Write-Warning "Failed to remove registry entry '$entry': $_"
+                    }
+                }
+            }
+        } else {
+            Write-Host "No registry entries found in $regPath for memz variants." -ForegroundColor Green
+        }
+    } catch {
+        Write-Warning "Error accessing registry path $regPath: $_"
+    }
+}
+
+# (Optional) List Volume Shadow Copies – Warning: This may lead to data loss if removed.
+try {
+    $shadowCopies = vssadmin list shadows
+    if ($shadowCopies) {
+        Write-Host "Shadow copies detected. Review them manually." -ForegroundColor Yellow
+        # To delete all shadow copies, uncomment the next line (WARNING: Data loss potential):
+        # vssadmin delete shadows /all /quiet
+    } else {
+        Write-Host "No shadow copies found." -ForegroundColor Green
+    }
+} catch {
+    Write-Warning "Failed to list shadow copies: $_"
+}
+
 Write-Host "Script execution completed." -ForegroundColor Cyan
+
 <#
-Hopefully this worked, and thank you for using one of my hell holes of a script!
-If you have any questions, feel free to ask.
+Hopefully, this enhanced script addresses not just process termination and file deletion but also removes some common persistence mechanisms such as scheduled tasks and registry Run entries.
+If you encounter any issues or have additional IoCs to cover, tweak accordingly.
 End of script
 #>
