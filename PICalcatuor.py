@@ -1,5 +1,5 @@
 # Made By DrKel
-# Please Credit DrKel (Or VisAwesme or Vaughn R)
+# Please Credit DrKel if reusing in your own scripts. (Or VisAwesme or Vaughn R)
 # Warning: This script uses DrKel's top-secret algorithm to approximate pi.
 # It’s so vintage slow that your CPU might stage a rebellion if you run it too long.
 # Use at your own risk—excessive nerdiness may ensue.
