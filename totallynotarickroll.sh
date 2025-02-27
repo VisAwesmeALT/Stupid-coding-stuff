@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Made By DrKel
+# Please Credit DrKel if reusing in your own scripts (Or VisAwesme or Vaughn R)... not sure why you would wana reuse this script though...
+
 # To run first do this in your CLI: chmod +x totallynotarickroll.sh
 # Then: ./rickroll.sh
 
